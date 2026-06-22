@@ -28,19 +28,14 @@ export default function PackageQuery() {
   const [keyword, setKeyword] = useState('')
   const [results, setResults] = useState<PackageType[]>([])
   const [searched, setSearched] = useState(false)
-  const [isSearching, setIsSearching] = useState(false)
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     if (!keyword.trim()) return
-    setIsSearching(true)
     updateWarningLevels()
-    setTimeout(() => {
-      const pkgs = queryPackage(keyword)
-      setResults(pkgs)
-      setSearched(true)
-      setIsSearching(false)
-    }, 300)
+    const pkgs = queryPackage(keyword)
+    setResults(pkgs)
+    setSearched(true)
   }
 
   const formatTime = (iso: string) => {
@@ -81,10 +76,10 @@ export default function PackageQuery() {
                 </div>
                 <button
                   type="submit"
-                  disabled={!keyword.trim() || isSearching}
+                  disabled={!keyword.trim()}
                   className="btn-primary px-6 py-3 text-base disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSearching ? '查询中...' : '查询'}
+                  查询
                 </button>
               </div>
               <p className="mt-2 text-xs text-slate-500">
