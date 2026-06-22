@@ -5,6 +5,13 @@ export type NotificationStatus = 'sent' | 'delivered' | 'failed'
 export type PickupMethod = 'code' | 'manual' | 'batch'
 export type ReturnReason = 'overdue' | 'damaged' | 'recipient_refused' | 'other'
 
+export interface PickupPoint {
+  id: string
+  name: string
+  description: string
+  color: string
+}
+
 export interface Package {
   id: string
   recipientName: string
@@ -21,6 +28,7 @@ export interface Package {
   markedForReturnAt?: string | null
   returnedAt?: string | null
   returnReason?: ReturnReason | null
+  pickupPointId: string
 }
 
 export interface WarningRecord {
@@ -65,6 +73,7 @@ export interface ReturnRecord {
   returnReason: ReturnReason
   operatorId: string
   retentionHours: number
+  pickupPointId: string
 }
 
 export interface WarningRule {
@@ -77,6 +86,7 @@ export interface WarningRule {
 
 export interface DailyStats {
   date: string
+  pickupPointId: string
   storedCount: number
   pickedUpCount: number
   returnedCount: number

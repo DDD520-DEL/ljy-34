@@ -1,5 +1,5 @@
 import { parseISO } from 'date-fns'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Search,
   ExternalLink,
+  MapPin,
 } from 'lucide-react'
 import { usePackageStore } from '@/store'
 import Toast from '@/components/Toast'
@@ -28,13 +29,25 @@ const navItems = [
 export default function Layout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
-  const { packages, notifications } = usePackageStore()
+  const { packages, notifications, pickupPoints } = usePackageStore()
 
   const storedPackages = packages.filter(p => p.status === 'stored')
   const yellowCount = storedPackages.filter(p => p.warningLevel === 'yellow').length
   const orangeCount = storedPackages.filter(p => p.warningLevel === 'orange').length
   const redCount = storedPackages.filter(p => p.warningLevel === 'red').length
   const totalWarnings = yellowCount + orangeCount + redCount
+
+  const pickupPointStats = useMemo(() => {
+    return pickupPoints.map(point => {
+      const pointPackages = packages.filter(p => p.pickupPointId === point.id && p.status === 'stored')
+      const warningCount = pointPackages.filter(p => p.warningLevel !== 'none').length
+      return {
+        ...point,
+        pendingCount: pointPackages.length,
+        warningCount,
+      }
+    })
+  }, [packages, pickupPoints])
 
   const recentNotifications = [...notifications].sort(
     (a, b) => parseISO(b.sentAt).getTime() - parseISO(a.sentAt).getTime()
@@ -67,7 +80,7 @@ export default function Layout() {
           </button>
         </div>
 
-        <nav className="flex-1 py-3 space-y-0.5 px-2">
+        <nav className="py-3 space-y-0.5 px-2">
           {navItems.map((item) => (
             <NavLink
               key={item.path}
@@ -96,6 +109,39 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
+
+        {!sidebarCollapsed && (
+          <div className="px-2 pb-2">
+            <div className="p-3 rounded-lg bg-white/5 space-y-2">
+              <div className="flex items-center gap-1.5 mb-2">
+                <MapPin className="w-3.5 h-3.5 text-slate-500" />
+                <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">代收点状态</span>
+              </div>
+              {pickupPointStats.map(point => (
+                <NavLink
+                  key={point.id}
+                  to="/packages"
+                  className="flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-white/5 transition-colors group"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: point.color }} />
+                    <span className="text-xs text-slate-400 group-hover:text-white transition-colors">{point.name}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {point.warningCount > 0 && (
+                      <span className="text-[10px] bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded-full">
+                        {point.warningCount}
+                      </span>
+                    )}
+                    <span className="text-xs font-medium text-white bg-brand-500/20 px-1.5 py-0.5 rounded-full">
+                      {point.pendingCount}待取
+                    </span>
+                  </div>
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        )}
 
         {!sidebarCollapsed && (
           <div className="p-3 m-2 rounded-lg bg-white/5 space-y-2">

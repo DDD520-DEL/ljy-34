@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Plus, Search, X, RotateCcw } from 'lucide-react'
+import { Plus, Search, X, RotateCcw, MapPin } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { usePackageStore } from '@/store'
 import {
@@ -31,20 +31,24 @@ interface FormData {
   courierCompany: string
   trackingNumber: string
   shelfNumber: string
-}
-
-const emptyForm: FormData = {
-  recipientName: '', recipientPhone: '', courierCompany: COURIER_OPTIONS[0],
-  trackingNumber: '', shelfNumber: '',
+  pickupPointId: string
 }
 
 export default function Packages() {
-  const { packages, addPackage, pickupPackage, confirmReturn } = usePackageStore()
+  const { packages, pickupPoints, addPackage, pickupPackage, confirmReturn } = usePackageStore()
   const [showModal, setShowModal] = useState(false)
-  const [form, setForm] = useState<FormData>(emptyForm)
+  const [form, setForm] = useState<FormData>({
+    recipientName: '',
+    recipientPhone: '',
+    courierCompany: COURIER_OPTIONS[0],
+    trackingNumber: '',
+    shelfNumber: '',
+    pickupPointId: pickupPoints[0]?.id || '',
+  })
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | Package['status']>('all')
   const [warningFilter, setWarningFilter] = useState<'all' | WarningLevel>('all')
+  const [pickupPointFilter, setPickupPointFilter] = useState<'all' | string>('all')
 
   const filtered = useMemo(() => {
     let list = [...packages]
@@ -56,6 +60,7 @@ export default function Packages() {
     }
     if (statusFilter !== 'all') list = list.filter(p => p.status === statusFilter)
     if (warningFilter !== 'all') list = list.filter(p => p.warningLevel === warningFilter)
+    if (pickupPointFilter !== 'all') list = list.filter(p => p.pickupPointId === pickupPointFilter)
     list.sort((a, b) => {
       const statusOrder: Record<Package['status'], number> = {
         pending_return: 0,
@@ -69,12 +74,27 @@ export default function Packages() {
       return parseISO(a.storageTime).getTime() - parseISO(b.storageTime).getTime()
     })
     return list
-  }, [packages, search, statusFilter, warningFilter])
+  }, [packages, search, statusFilter, warningFilter, pickupPointFilter])
+
+  const getPickupPointName = (id: string) => {
+    return pickupPoints.find(p => p.id === id)?.name || '-'
+  }
+
+  const getPickupPointColor = (id: string) => {
+    return pickupPoints.find(p => p.id === id)?.color || '#64748b'
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     addPackage({ ...form, storageTime: new Date().toISOString() })
-    setForm(emptyForm)
+    setForm({
+      recipientName: '',
+      recipientPhone: '',
+      courierCompany: COURIER_OPTIONS[0],
+      trackingNumber: '',
+      shelfNumber: '',
+      pickupPointId: pickupPoints[0]?.id || '',
+    })
     setShowModal(false)
   }
 
@@ -108,6 +128,12 @@ export default function Packages() {
             value={search} onChange={e => setSearch(e.target.value)}
           />
         </div>
+        <select className="input-field w-36" value={pickupPointFilter} onChange={e => setPickupPointFilter(e.target.value)}>
+          <option value="all">全部代收点</option>
+          {pickupPoints.map(p => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
         <select className="input-field w-32" value={statusFilter} onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}>
           <option value="all">全部状态</option>
           <option value="stored">待取件</option>
@@ -128,16 +154,22 @@ export default function Packages() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200/60">
-                {['快递公司', '快递单号', '收件人', '联系电话', '货架号', '入库时间', '滞留时长', '预警等级', '状态', '退回原因', '查询次数', '最后查询', '操作'].map(h => (
+                {['代收点', '快递公司', '快递单号', '收件人', '联系电话', '货架号', '入库时间', '滞留时长', '预警等级', '状态', '退回原因', '查询次数', '最后查询', '操作'].map(h => (
                   <th key={h} className="px-4 py-3 text-left font-medium text-slate-500 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.length === 0 ? (
-                <tr><td colSpan={13} className="px-4 py-12 text-center text-slate-400">暂无包裹数据</td></tr>
+                <tr><td colSpan={14} className="px-4 py-12 text-center text-slate-400">暂无包裹数据</td></tr>
               ) : filtered.map(pkg => (
                 <tr key={pkg.id} className="hover:bg-slate-50/50 transition-colors">
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1 text-xs font-medium">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: getPickupPointColor(pkg.pickupPointId) }} />
+                      {getPickupPointName(pkg.pickupPointId)}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 whitespace-nowrap">{pkg.courierCompany}</td>
                   <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">...{pkg.trackingNumber.slice(-6)}</td>
                   <td className="px-4 py-3 whitespace-nowrap">{pkg.recipientName}</td>
@@ -208,6 +240,18 @@ export default function Packages() {
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5 text-brand-500" />
+                  所属代收点
+                </label>
+                <select className="input-field" required value={form.pickupPointId}
+                  onChange={e => setForm(f => ({ ...f, pickupPointId: e.target.value }))}>
+                  {pickupPoints.map(p => (
+                    <option key={p.id} value={p.id}>{p.name} - {p.description}</option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">收件人姓名</label>
                 <input className="input-field" required value={form.recipientName}

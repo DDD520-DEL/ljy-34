@@ -3,12 +3,13 @@ import { NavLink } from 'react-router-dom'
 import { format, parseISO, isSameDay } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import { PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
-import { Package, Clock, AlertTriangle, CheckCircle, ClipboardCheck, BarChart3, RotateCcw } from 'lucide-react'
+import { Package, Clock, AlertTriangle, CheckCircle, ClipboardCheck, BarChart3, RotateCcw, Filter } from 'lucide-react'
 import { usePackageStore } from '@/store'
 import { getWarningLevelLabel } from '@/utils/warning'
+import type { DailyStats } from '@/types'
 
 export default function Dashboard() {
-  const { packages, dailyStats, warningRules, updateWarningLevels, checkOverduePackages } = usePackageStore()
+  const { packages, dailyStats, warningRules, pickupPoints, selectedPickupPointId, setSelectedPickupPointId, updateWarningLevels, checkOverduePackages } = usePackageStore()
 
   const today = new Date()
 
@@ -20,19 +21,54 @@ export default function Dashboard() {
     return () => clearInterval(interval)
   }, [updateWarningLevels, checkOverduePackages])
 
+  const filteredPackages = useMemo(() => {
+    if (selectedPickupPointId === 'all') return packages
+    return packages.filter(p => p.pickupPointId === selectedPickupPointId)
+  }, [packages, selectedPickupPointId])
+
+  const filteredDailyStats = useMemo(() => {
+    if (selectedPickupPointId === 'all') {
+      const grouped: Record<string, DailyStats> = {}
+      dailyStats.forEach(s => {
+        if (!grouped[s.date]) {
+          grouped[s.date] = {
+            date: s.date,
+            pickupPointId: 'all',
+            storedCount: 0,
+            pickedUpCount: 0,
+            returnedCount: 0,
+            notificationCount: 0,
+            yellowCount: 0,
+            orangeCount: 0,
+            redCount: 0,
+          }
+        }
+        grouped[s.date].storedCount += s.storedCount
+        grouped[s.date].pickedUpCount += s.pickedUpCount
+        grouped[s.date].returnedCount += s.returnedCount
+        grouped[s.date].notificationCount += s.notificationCount
+        grouped[s.date].yellowCount += s.yellowCount
+        grouped[s.date].orangeCount += s.orangeCount
+        grouped[s.date].redCount += s.redCount
+      })
+      return Object.values(grouped)
+    }
+    return dailyStats.filter(s => s.pickupPointId === selectedPickupPointId)
+  }, [dailyStats, selectedPickupPointId])
+
   const stats = useMemo(() => {
-    const storedToday = packages.filter(p => isSameDay(parseISO(p.storageTime), today) && p.status === 'stored').length
-    const pending = packages.filter(p => p.status === 'stored').length
-    const pendingReturn = packages.filter(p => p.status === 'pending_return').length
-    const warning = packages.filter(p => p.warningLevel !== 'none' && p.status === 'stored').length
-    const pickedUp = packages.filter(p => p.status === 'picked_up').length
-    const returned = packages.filter(p => p.status === 'returned').length
+    const storedToday = filteredPackages.filter(p => isSameDay(parseISO(p.storageTime), today) && p.status === 'stored').length
+    const pending = filteredPackages.filter(p => p.status === 'stored').length
+    const pendingReturn = filteredPackages.filter(p => p.status === 'pending_return').length
+    const warning = filteredPackages.filter(p => p.warningLevel !== 'none' && p.status === 'stored').length
+    const pickedUp = filteredPackages.filter(p => p.status === 'picked_up').length
+    const returned = filteredPackages.filter(p => p.status === 'returned').length
     return { storedToday, pending, pendingReturn, warning, pickedUp, returned }
-  }, [packages, today])
+  }, [filteredPackages, today])
 
   const warningData = useMemo(() => {
     const counts = { yellow: 0, orange: 0, red: 0 }
-    packages.forEach(p => {
+    filteredPackages.forEach(p => {
       if (p.warningLevel !== 'none' && (p.status === 'stored' || p.status === 'pending_return')) {
         counts[p.warningLevel]++
       }
@@ -42,16 +78,16 @@ export default function Dashboard() {
       { name: getWarningLevelLabel('orange'), value: counts.orange, color: '#F97316' },
       { name: getWarningLevelLabel('red'), value: counts.red, color: '#EF4444' },
     ].filter(d => d.value > 0)
-  }, [packages])
+  }, [filteredPackages])
 
   const trendData = useMemo(() => {
-    return dailyStats.map(s => ({
+    return filteredDailyStats.map(s => ({
       date: s.date,
       storedCount: s.storedCount,
       pickedUpCount: s.pickedUpCount,
       returnedCount: s.returnedCount,
     }))
-  }, [dailyStats])
+  }, [filteredDailyStats])
 
   const totalWarning = warningData.reduce((s, d) => s + d.value, 0)
 
@@ -72,11 +108,28 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">工作台</h1>
-        <p className="text-sm text-slate-400 mt-1">
-          {format(new Date(), 'yyyy年M月d日 EEEE', { locale: zhCN })}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">工作台</h1>
+          <p className="text-sm text-slate-400 mt-1">
+            {format(new Date(), 'yyyy年M月d日 EEEE', { locale: zhCN })}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-slate-200">
+            <Filter className="w-4 h-4 text-slate-400" />
+            <select
+              value={selectedPickupPointId}
+              onChange={(e) => setSelectedPickupPointId(e.target.value)}
+              className="text-sm text-slate-700 bg-transparent outline-none cursor-pointer pr-1"
+            >
+              <option value="all">全部代收点</option>
+              {pickupPoints.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">

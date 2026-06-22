@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { AlertTriangle, Bell, Smartphone, Clock, Send, MessageSquare, Save, RotateCcw, History, CheckSquare, Settings, RefreshCw } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { AlertTriangle, Bell, Smartphone, Clock, Send, MessageSquare, Save, RotateCcw, History, CheckSquare, Settings, RefreshCw, MapPin } from 'lucide-react'
 import { parseISO, format } from 'date-fns'
 import { usePackageStore } from '@/store'
 import {
@@ -13,7 +13,7 @@ import {
   getStatusBg,
   getStatusLabel,
 } from '@/utils/warning'
-import type { WarningLevel, WarningRule, NotificationChannel } from '@/types'
+import type { WarningLevel, WarningRule, NotificationChannel, Package } from '@/types'
 
 type MainTab = 'list' | 'returns' | 'returnHistory' | 'rules' | 'notifications'
 type LevelFilter = 'all' | WarningLevel
@@ -37,12 +37,38 @@ export default function Warnings() {
   const [mainTab, setMainTab] = useState<MainTab>('list')
   const [levelFilter, setLevelFilter] = useState<LevelFilter>('all')
   const [selectedReturnIds, setSelectedReturnIds] = useState<string[]>([])
-  const { packages, notifications, warningRules, returnRecords, sendNotification, updateWarningRule, confirmReturn, batchConfirmReturn, checkOverduePackages, maxRetentionDays, setMaxRetentionDays } = usePackageStore()
+  const { packages, pickupPoints, notifications, warningRules, returnRecords, sendNotification, updateWarningRule, confirmReturn, batchConfirmReturn, checkOverduePackages, maxRetentionDays, setMaxRetentionDays } = usePackageStore()
 
   const warningPackages = packages.filter(p => p.status === 'stored' && p.warningLevel !== 'none')
   const filtered = levelFilter === 'all' ? warningPackages : warningPackages.filter(p => p.warningLevel === levelFilter)
 
+  const warningPackagesByPoint = useMemo(() => {
+    const grouped: Record<string, Package[]> = {}
+    pickupPoints.forEach(p => grouped[p.id] = [])
+    filtered.forEach(pkg => {
+      if (!grouped[pkg.pickupPointId]) grouped[pkg.pickupPointId] = []
+      grouped[pkg.pickupPointId].push(pkg)
+    })
+    return pickupPoints.map(point => ({
+      ...point,
+      packages: grouped[point.id] || [],
+    }))
+  }, [filtered, pickupPoints])
+
   const pendingReturnPackages = packages.filter(p => p.status === 'pending_return')
+
+  const pendingReturnsByPoint = useMemo(() => {
+    const grouped: Record<string, Package[]> = {}
+    pickupPoints.forEach(p => grouped[p.id] = [])
+    pendingReturnPackages.forEach(pkg => {
+      if (!grouped[pkg.pickupPointId]) grouped[pkg.pickupPointId] = []
+      grouped[pkg.pickupPointId].push(pkg)
+    })
+    return pickupPoints.map(point => ({
+      ...point,
+      packages: grouped[point.id] || [],
+    }))
+  }, [pendingReturnPackages, pickupPoints])
 
   const sortedNotifications = [...notifications].sort(
     (a, b) => parseISO(b.sentAt).getTime() - parseISO(a.sentAt).getTime()
@@ -51,6 +77,14 @@ export default function Warnings() {
   const sortedReturnRecords = [...returnRecords].sort(
     (a, b) => parseISO(b.returnedAt).getTime() - parseISO(a.returnedAt).getTime()
   )
+
+  const getPickupPointName = (id: string) => {
+    return pickupPoints.find(p => p.id === id)?.name || '-'
+  }
+
+  const getPickupPointColor = (id: string) => {
+    return pickupPoints.find(p => p.id === id)?.color || '#64748b'
+  }
 
   const toggleSelectReturn = (id: string) => {
     setSelectedReturnIds(prev =>
@@ -147,50 +181,67 @@ export default function Warnings() {
               <p>暂无预警包裹</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {filtered.map(pkg => (
-                <div
-                  key={pkg.id}
-                  className="bg-white rounded-xl border border-slate-200/60 p-4 hover:shadow-sm transition-shadow"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-slate-800">{pkg.recipientName}</span>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
-                          getWarningLevelBg(pkg.warningLevel)
-                        } ${pkg.warningLevel === 'red' ? 'animate-pulse-slow' : ''}`}>
-                          {getWarningLevelLabel(pkg.warningLevel)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-slate-500">
-                        <span>{pkg.courierCompany}</span>
-                        <span>货架 {pkg.shelfNumber}</span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5" />
-                          滞留 {formatRetentionPolicy(getRetentionHours(pkg.storageTime))}
-                        </span>
-                        <span>{maskPhone(pkg.recipientPhone)}</span>
-                      </div>
-                    </div>
+            <div className="space-y-6">
+              {warningPackagesByPoint.map(point => (
+                point.packages.length > 0 && (
+                  <div key={point.id} className="space-y-3">
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => sendNotification(pkg.id, 'in_app')}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-brand-500/10 text-brand-600 rounded-lg hover:bg-brand-500/20 transition-colors"
-                      >
-                        <Send className="w-3.5 h-3.5" />
-                        发送站内通知
-                      </button>
-                      <button
-                        onClick={() => sendNotification(pkg.id, 'sms')}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-orange-500/10 text-orange-600 rounded-lg hover:bg-orange-500/20 transition-colors"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        发送短信
-                      </button>
+                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: point.color }} />
+                      <h3 className="text-sm font-semibold text-slate-700">{point.name}</h3>
+                      <span className="text-xs text-slate-400">({point.packages.length} 个预警包裹)</span>
+                    </div>
+                    <div className="space-y-3">
+                      {point.packages.map(pkg => (
+                        <div
+                          key={pkg.id}
+                          className="bg-white rounded-xl border border-slate-200/60 p-4 hover:shadow-sm transition-shadow"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 space-y-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium text-slate-800">{pkg.recipientName}</span>
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
+                                  getWarningLevelBg(pkg.warningLevel)
+                                } ${pkg.warningLevel === 'red' ? 'animate-pulse-slow' : ''}`}>
+                                  {getWarningLevelLabel(pkg.warningLevel)}
+                                </span>
+                                <span className="inline-flex items-center gap-1 text-xs text-slate-400">
+                                  <MapPin className="w-3 h-3" />
+                                  {getPickupPointName(pkg.pickupPointId)}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-4 text-sm text-slate-500 flex-wrap">
+                                <span>{pkg.courierCompany}</span>
+                                <span>货架 {pkg.shelfNumber}</span>
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3.5 h-3.5" />
+                                  滞留 {formatRetentionPolicy(getRetentionHours(pkg.storageTime))}
+                                </span>
+                                <span>{maskPhone(pkg.recipientPhone)}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => sendNotification(pkg.id, 'in_app')}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-brand-500/10 text-brand-600 rounded-lg hover:bg-brand-500/20 transition-colors"
+                              >
+                                <Send className="w-3.5 h-3.5" />
+                                发送站内通知
+                              </button>
+                              <button
+                                onClick={() => sendNotification(pkg.id, 'sms')}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-orange-500/10 text-orange-600 rounded-lg hover:bg-orange-500/20 transition-colors"
+                              >
+                                <MessageSquare className="w-3.5 h-3.5" />
+                                发送短信
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </div>
+                )
               ))}
             </div>
           )}
@@ -242,64 +293,81 @@ export default function Warnings() {
               <p>暂无待退回包裹</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {pendingReturnPackages.map(pkg => (
-                <div
-                  key={pkg.id}
-                  className={`bg-white rounded-xl border p-4 hover:shadow-sm transition-shadow ${
-                    selectedReturnIds.includes(pkg.id) ? 'border-red-300 bg-red-50/30' : 'border-slate-200/60'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedReturnIds.includes(pkg.id)}
-                        onChange={() => toggleSelectReturn(pkg.id)}
-                        className="mt-1 w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                      />
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-slate-800">{pkg.recipientName}</span>
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusBg(pkg.status)}`}>
-                            {getStatusLabel(pkg.status)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-slate-500">
-                          <span>{pkg.courierCompany}</span>
-                          <span className="font-mono text-xs">...{pkg.trackingNumber.slice(-6)}</span>
-                          <span>货架 {pkg.shelfNumber}</span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5" />
-                            滞留 {formatRetentionPolicy(getRetentionHours(pkg.storageTime))}
-                          </span>
-                          <span>{maskPhone(pkg.recipientPhone)}</span>
-                        </div>
-                        {pkg.markedForReturnAt && (
-                          <p className="text-xs text-slate-400">
-                            标记退回时间：{format(parseISO(pkg.markedForReturnAt), 'yyyy-MM-dd HH:mm')}
-                          </p>
-                        )}
-                      </div>
-                    </div>
+            <div className="space-y-6">
+              {pendingReturnsByPoint.map(point => (
+                point.packages.length > 0 && (
+                  <div key={point.id} className="space-y-3">
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => sendNotification(pkg.id, 'both')}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-orange-500/10 text-orange-600 rounded-lg hover:bg-orange-500/20 transition-colors"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        提醒收件人
-                      </button>
-                      <button
-                        onClick={() => confirmReturn(pkg.id, 'overdue')}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-                      >
-                        <CheckSquare className="w-3.5 h-3.5" />
-                        确认退回
-                      </button>
+                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: point.color }} />
+                      <h3 className="text-sm font-semibold text-slate-700">{point.name}</h3>
+                      <span className="text-xs text-slate-400">({point.packages.length} 个待退回)</span>
+                    </div>
+                    <div className="space-y-3">
+                      {point.packages.map(pkg => (
+                        <div
+                          key={pkg.id}
+                          className={`bg-white rounded-xl border p-4 hover:shadow-sm transition-shadow ${
+                            selectedReturnIds.includes(pkg.id) ? 'border-red-300 bg-red-50/30' : 'border-slate-200/60'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedReturnIds.includes(pkg.id)}
+                                onChange={() => toggleSelectReturn(pkg.id)}
+                                className="mt-1 w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                              />
+                              <div className="flex-1 space-y-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-medium text-slate-800">{pkg.recipientName}</span>
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusBg(pkg.status)}`}>
+                                    {getStatusLabel(pkg.status)}
+                                  </span>
+                                  <span className="inline-flex items-center gap-1 text-xs text-slate-400">
+                                    <MapPin className="w-3 h-3" />
+                                    {getPickupPointName(pkg.pickupPointId)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-4 text-sm text-slate-500 flex-wrap">
+                                  <span>{pkg.courierCompany}</span>
+                                  <span className="font-mono text-xs">...{pkg.trackingNumber.slice(-6)}</span>
+                                  <span>货架 {pkg.shelfNumber}</span>
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="w-3.5 h-3.5" />
+                                    滞留 {formatRetentionPolicy(getRetentionHours(pkg.storageTime))}
+                                  </span>
+                                  <span>{maskPhone(pkg.recipientPhone)}</span>
+                                </div>
+                                {pkg.markedForReturnAt && (
+                                  <p className="text-xs text-slate-400">
+                                    标记退回时间：{format(parseISO(pkg.markedForReturnAt), 'yyyy-MM-dd HH:mm')}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => sendNotification(pkg.id, 'both')}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-orange-500/10 text-orange-600 rounded-lg hover:bg-orange-500/20 transition-colors"
+                              >
+                                <MessageSquare className="w-3.5 h-3.5" />
+                                提醒收件人
+                              </button>
+                              <button
+                                onClick={() => confirmReturn(pkg.id, 'overdue')}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                              >
+                                <CheckSquare className="w-3.5 h-3.5" />
+                                确认退回
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </div>
+                )
               ))}
             </div>
           )}
@@ -318,7 +386,7 @@ export default function Warnings() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200/60">
-                    {['收件人', '联系电话', '快递公司', '快递单号', '货架号', '入库时间', '滞留时长', '退回原因', '退回时间'].map(h => (
+                    {['代收点', '收件人', '联系电话', '快递公司', '快递单号', '货架号', '入库时间', '滞留时长', '退回原因', '退回时间'].map(h => (
                       <th key={h} className="px-4 py-3 text-left font-medium text-slate-500 whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -326,6 +394,12 @@ export default function Warnings() {
                 <tbody className="divide-y divide-slate-100">
                   {sortedReturnRecords.map(record => (
                     <tr key={record.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 text-xs font-medium">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: getPickupPointColor(record.pickupPointId) }} />
+                          {getPickupPointName(record.pickupPointId)}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 whitespace-nowrap font-medium text-slate-700">{record.recipientName}</td>
                       <td className="px-4 py-3 whitespace-nowrap">{maskPhone(record.recipientPhone)}</td>
                       <td className="px-4 py-3 whitespace-nowrap">{record.courierCompany}</td>

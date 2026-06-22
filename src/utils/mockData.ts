@@ -1,11 +1,17 @@
 import { format, subDays, subHours, subMinutes, parseISO } from 'date-fns'
-import type { Package, WarningRecord, Notification, PickupRecord, DailyStats, ReturnRecord, ReturnReason } from '@/types'
+import type { Package, WarningRecord, Notification, PickupRecord, DailyStats, ReturnRecord, ReturnReason, PickupPoint } from '@/types'
 
 const now = new Date()
 const courierCompanies = ['顺丰速运', '中通快递', '圆通速递', '韵达快递', '申通快递', '京东物流', '极兔速递', '邮政EMS']
 const names = ['张伟', '王芳', '李强', '赵敏', '刘洋', '陈静', '杨帆', '黄磊', '周婷', '吴涛', '徐丽', '孙鹏']
 const shelves = ['A-01', 'A-02', 'A-03', 'B-01', 'B-02', 'B-03', 'C-01', 'C-02', 'C-03']
 const returnReasons: ReturnReason[] = ['overdue', 'damaged', 'recipient_refused', 'other']
+
+export const pickupPoints: PickupPoint[] = [
+  { id: 'point-east', name: '小区东门', description: '东门岗亭旁快递柜', color: '#5c7cfa' },
+  { id: 'point-west', name: '小区西门', description: '西门物业服务中心', color: '#10b981' },
+  { id: 'point-center', name: '物业中心', description: '物业楼1层大厅', color: '#f59e0b' },
+]
 
 function generatePickupCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000))
@@ -18,6 +24,10 @@ function generateId(): string {
 function generatePhone(): string {
   const prefixes = ['138', '139', '158', '159', '186', '187', '135', '136']
   return prefixes[Math.floor(Math.random() * prefixes.length)] + String(Math.floor(10000000 + Math.random() * 90000000))
+}
+
+function randomPickupPointId(): string {
+  return pickupPoints[Math.floor(Math.random() * pickupPoints.length)].id
 }
 
 export function generateMockPackages(): Package[] {
@@ -50,6 +60,7 @@ export function generateMockPackages(): Package[] {
       markedForReturnAt: null,
       returnedAt: null,
       returnReason: null,
+      pickupPointId: randomPickupPointId(),
       ...queryData,
     })
   }
@@ -71,6 +82,7 @@ export function generateMockPackages(): Package[] {
       markedForReturnAt: null,
       returnedAt: null,
       returnReason: null,
+      pickupPointId: randomPickupPointId(),
       ...queryData,
     })
   }
@@ -92,6 +104,7 @@ export function generateMockPackages(): Package[] {
       markedForReturnAt: null,
       returnedAt: null,
       returnReason: null,
+      pickupPointId: randomPickupPointId(),
       ...queryData,
     })
   }
@@ -113,6 +126,7 @@ export function generateMockPackages(): Package[] {
       markedForReturnAt: null,
       returnedAt: null,
       returnReason: null,
+      pickupPointId: randomPickupPointId(),
       ...queryData,
     })
   }
@@ -135,6 +149,7 @@ export function generateMockPackages(): Package[] {
       markedForReturnAt: markedAt.toISOString(),
       returnedAt: null,
       returnReason: null,
+      pickupPointId: randomPickupPointId(),
       ...queryData,
     })
   }
@@ -156,6 +171,7 @@ export function generateMockPackages(): Package[] {
       markedForReturnAt: null,
       returnedAt: null,
       returnReason: null,
+      pickupPointId: randomPickupPointId(),
       ...queryData,
     })
   }
@@ -178,6 +194,7 @@ export function generateMockPackages(): Package[] {
       markedForReturnAt: subDays(returnedAt, 1).toISOString(),
       returnedAt: returnedAt.toISOString(),
       returnReason: returnReasons[Math.floor(Math.random() * returnReasons.length)],
+      pickupPointId: randomPickupPointId(),
       ...queryData,
     })
   }
@@ -318,6 +335,7 @@ export function generateMockReturnRecords(): ReturnRecord[] {
       returnReason: returnReasons[Math.floor(Math.random() * returnReasons.length)],
       operatorId: 'admin',
       retentionHours: Math.floor(Math.random() * 48) + 168,
+      pickupPointId: randomPickupPointId(),
     })
   }
   return records
@@ -327,16 +345,19 @@ export function generateMockDailyStats(): DailyStats[] {
   const stats: DailyStats[] = []
   for (let i = 6; i >= 0; i--) {
     const date = subDays(now, i)
-    stats.push({
-      date: format(date, 'yyyy-MM-dd'),
-      storedCount: Math.floor(Math.random() * 15) + 5,
-      pickedUpCount: Math.floor(Math.random() * 12) + 3,
-      returnedCount: Math.floor(Math.random() * 3),
-      notificationCount: Math.floor(Math.random() * 8) + 2,
-      yellowCount: Math.floor(Math.random() * 5) + 1,
-      orangeCount: Math.floor(Math.random() * 3),
-      redCount: Math.floor(Math.random() * 2),
-    })
+    for (const point of pickupPoints) {
+      stats.push({
+        date: format(date, 'yyyy-MM-dd'),
+        pickupPointId: point.id,
+        storedCount: Math.floor(Math.random() * 8) + 2,
+        pickedUpCount: Math.floor(Math.random() * 6) + 1,
+        returnedCount: Math.floor(Math.random() * 2),
+        notificationCount: Math.floor(Math.random() * 4) + 1,
+        yellowCount: Math.floor(Math.random() * 3),
+        orangeCount: Math.floor(Math.random() * 2),
+        redCount: Math.random() > 0.7 ? 1 : 0,
+      })
+    }
   }
   return stats
 }

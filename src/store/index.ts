@@ -1,9 +1,9 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { differenceInHours, parseISO } from 'date-fns'
-import type { Package, WarningRecord, Notification, PickupRecord, WarningRule, DailyStats, WarningLevel, ReturnRecord, ReturnReason } from '@/types'
+import type { Package, WarningRecord, Notification, PickupRecord, WarningRule, DailyStats, WarningLevel, ReturnRecord, ReturnReason, PickupPoint } from '@/types'
 import { calculateWarningLevel } from '@/utils/warning'
-import { generateMockPackages, generateMockWarningRecords, generateMockNotifications, generateMockPickupRecords, generateMockDailyStats, generateMockReturnRecords } from '@/utils/mockData'
+import { generateMockPackages, generateMockWarningRecords, generateMockNotifications, generateMockPickupRecords, generateMockDailyStats, generateMockReturnRecords, pickupPoints } from '@/utils/mockData'
 
 const MAX_RETENTION_DAYS = 7
 
@@ -15,6 +15,8 @@ interface PackageStore {
   returnRecords: ReturnRecord[]
   warningRules: WarningRule[]
   dailyStats: DailyStats[]
+  pickupPoints: PickupPoint[]
+  selectedPickupPointId: string | 'all'
   maxRetentionDays: number
   toasts: Array<{ id: string; message: string; type: 'success' | 'warning' | 'error' }>
 
@@ -29,6 +31,7 @@ interface PackageStore {
   sendNotification: (packageId: string, channel: 'in_app' | 'sms' | 'both') => void
   updateWarningRule: (id: string, updates: Partial<WarningRule>) => void
   setMaxRetentionDays: (days: number) => void
+  setSelectedPickupPointId: (id: string | 'all') => void
   addToast: (message: string, type?: 'success' | 'warning' | 'error') => void
   removeToast: (id: string) => void
   initMockData: () => void
@@ -68,8 +71,14 @@ export const usePackageStore = create<PackageStore>()(
       returnRecords: [],
       warningRules: defaultWarningRules,
       dailyStats: [],
+      pickupPoints: pickupPoints,
+      selectedPickupPointId: 'all',
       maxRetentionDays: MAX_RETENTION_DAYS,
       toasts: [],
+
+      setSelectedPickupPointId: (id) => {
+        set({ selectedPickupPointId: id })
+      },
 
       addPackage: (pkgData) => {
         const newPkg: Package = {
@@ -85,7 +94,8 @@ export const usePackageStore = create<PackageStore>()(
           returnReason: null,
         }
         set((state) => ({ packages: [...state.packages, newPkg] }))
-        get().addToast(`包裹入库成功！取件码: ${newPkg.pickupCode}`, 'success')
+        const pointName = pickupPoints.find(p => p.id === newPkg.pickupPointId)?.name || ''
+        get().addToast(`【${pointName}】包裹入库成功！取件码: ${newPkg.pickupCode}`, 'success')
         return newPkg
       },
 
@@ -249,6 +259,7 @@ export const usePackageStore = create<PackageStore>()(
           returnReason: reason,
           operatorId: 'admin',
           retentionHours,
+          pickupPointId: pkg.pickupPointId,
         }
 
         const pickupRecord: PickupRecord = {
@@ -304,6 +315,7 @@ export const usePackageStore = create<PackageStore>()(
           returnReason: 'overdue' as ReturnReason,
           operatorId: 'admin',
           retentionHours: differenceInHours(now, parseISO(pkg.storageTime)),
+          pickupPointId: pkg.pickupPointId,
         }))
 
         const newPickupRecords: PickupRecord[] = validPkgs.map(pkg => ({
