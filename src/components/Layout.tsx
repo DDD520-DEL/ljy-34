@@ -11,6 +11,8 @@ import {
   X,
   Bell,
   ChevronRight,
+  Search,
+  ExternalLink,
 } from 'lucide-react'
 import { usePackageStore } from '@/store'
 import { getWarningLevelLabel } from '@/utils/warning'
@@ -97,8 +99,8 @@ export default function Layout() {
         </nav>
 
         {!sidebarCollapsed && (
-          <div className="p-3 m-2 rounded-lg bg-white/5">
-            <div className="flex items-center gap-2 mb-2">
+          <div className="p-3 m-2 rounded-lg bg-white/5 space-y-2">
+            <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-full bg-brand-500 flex items-center justify-center text-xs font-medium">
                 管
               </div>
@@ -107,6 +109,16 @@ export default function Layout() {
                 <p className="text-[10px] text-slate-500">代收点工作人员</p>
               </div>
             </div>
+            <a
+              href="/query"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-brand-600/20 text-brand-300 hover:bg-brand-600/30 hover:text-brand-200 transition-colors text-xs"
+            >
+              <Search className="w-3.5 h-3.5" />
+              收件人自助查询
+              <ExternalLink className="w-3 h-3 ml-auto" />
+            </a>
           </div>
         )}
       </aside>

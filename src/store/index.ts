@@ -13,7 +13,7 @@ interface PackageStore {
   dailyStats: DailyStats[]
   toasts: Array<{ id: string; message: string; type: 'success' | 'warning' | 'error' }>
 
-  addPackage: (pkg: Omit<Package, 'id' | 'warningLevel' | 'pickupCode' | 'status'>) => Package
+  addPackage: (pkg: Omit<Package, 'id' | 'warningLevel' | 'pickupCode' | 'status' | 'queryCount' | 'lastQueriedAt'>) => Package
   updateWarningLevels: () => void
   pickupPackage: (packageId: string, method: 'code' | 'manual' | 'batch') => void
   pickupByCode: (code: string) => boolean
@@ -23,6 +23,7 @@ interface PackageStore {
   addToast: (message: string, type?: 'success' | 'warning' | 'error') => void
   removeToast: (id: string) => void
   initMockData: () => void
+  queryPackage: (keyword: string) => Package[]
 }
 
 function generateId(): string {
@@ -57,10 +58,40 @@ export const usePackageStore = create<PackageStore>()(
           status: 'stored',
           warningLevel: 'none',
           pickupCode: generatePickupCode(),
+          queryCount: 0,
+          lastQueriedAt: null,
         }
         set((state) => ({ packages: [...state.packages, newPkg] }))
         get().addToast(`包裹入库成功！取件码: ${newPkg.pickupCode}`, 'success')
         return newPkg
+      },
+
+      queryPackage: (keyword) => {
+        const trimmedKeyword = keyword.trim()
+        if (!trimmedKeyword) return []
+
+        const results = get().packages.filter(pkg =>
+          pkg.recipientPhone === trimmedKeyword ||
+          pkg.pickupCode === trimmedKeyword
+        )
+
+        if (results.length > 0) {
+          const now = new Date().toISOString()
+          set((state) => ({
+            packages: state.packages.map(pkg => {
+              if (results.some(r => r.id === pkg.id)) {
+                return {
+                  ...pkg,
+                  queryCount: pkg.queryCount + 1,
+                  lastQueriedAt: now,
+                }
+              }
+              return pkg
+            }),
+          }))
+        }
+
+        return results
       },
 
       updateWarningLevels: () => {

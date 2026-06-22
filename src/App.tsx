@@ -6,6 +6,7 @@ import Packages from '@/pages/Packages'
 import Warnings from '@/pages/Warnings'
 import Pickup from '@/pages/Pickup'
 import Statistics from '@/pages/Statistics'
+import PackageQuery from '@/pages/PackageQuery'
 import { usePackageStore } from '@/store'
 
 function isLegacyDateFormat(dailyStats: { date: string }[]): boolean {
@@ -31,6 +32,7 @@ export default function App() {
   return (
     <Router>
       <Routes>
+        <Route path="/query" element={<PackageQuery />} />
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="/packages" element={<Packages />} />

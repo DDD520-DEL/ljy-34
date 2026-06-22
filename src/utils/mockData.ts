@@ -22,8 +22,19 @@ function generatePhone(): string {
 export function generateMockPackages(): Package[] {
   const packages: Package[] = []
 
+  function randomQueryData(): { queryCount: number; lastQueriedAt: string | null } {
+    const count = Math.floor(Math.random() * 10)
+    if (count === 0) return { queryCount: 0, lastQueriedAt: null }
+    const hoursAgo = Math.floor(Math.random() * 48)
+    return {
+      queryCount: count,
+      lastQueriedAt: subHours(now, hoursAgo).toISOString(),
+    }
+  }
+
   for (let i = 0; i < 8; i++) {
     const storageTime = subHours(now, Math.floor(Math.random() * 20) + 1)
+    const queryData = randomQueryData()
     packages.push({
       id: generateId(),
       recipientName: names[Math.floor(Math.random() * names.length)],
@@ -35,11 +46,13 @@ export function generateMockPackages(): Package[] {
       status: 'stored',
       warningLevel: 'none',
       pickupCode: generatePickupCode(),
+      ...queryData,
     })
   }
 
   for (let i = 0; i < 5; i++) {
     const storageTime = subHours(now, Math.floor(Math.random() * 24) + 24)
+    const queryData = randomQueryData()
     packages.push({
       id: generateId(),
       recipientName: names[Math.floor(Math.random() * names.length)],
@@ -51,11 +64,13 @@ export function generateMockPackages(): Package[] {
       status: 'stored',
       warningLevel: 'yellow',
       pickupCode: generatePickupCode(),
+      ...queryData,
     })
   }
 
   for (let i = 0; i < 3; i++) {
     const storageTime = subHours(now, Math.floor(Math.random() * 24) + 48)
+    const queryData = randomQueryData()
     packages.push({
       id: generateId(),
       recipientName: names[Math.floor(Math.random() * names.length)],
@@ -67,11 +82,13 @@ export function generateMockPackages(): Package[] {
       status: 'stored',
       warningLevel: 'orange',
       pickupCode: generatePickupCode(),
+      ...queryData,
     })
   }
 
   for (let i = 0; i < 2; i++) {
     const storageTime = subHours(now, Math.floor(Math.random() * 48) + 72)
+    const queryData = randomQueryData()
     packages.push({
       id: generateId(),
       recipientName: names[Math.floor(Math.random() * names.length)],
@@ -83,11 +100,13 @@ export function generateMockPackages(): Package[] {
       status: 'stored',
       warningLevel: 'red',
       pickupCode: generatePickupCode(),
+      ...queryData,
     })
   }
 
   for (let i = 0; i < 10; i++) {
     const storageTime = subDays(now, Math.floor(Math.random() * 5) + 1)
+    const queryData = randomQueryData()
     packages.push({
       id: generateId(),
       recipientName: names[Math.floor(Math.random() * names.length)],
@@ -99,6 +118,7 @@ export function generateMockPackages(): Package[] {
       status: 'picked_up',
       warningLevel: 'none',
       pickupCode: generatePickupCode(),
+      ...queryData,
     })
   }
 

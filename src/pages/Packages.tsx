@@ -111,14 +111,14 @@ export default function Packages() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200/60">
-                {['快递公司', '快递单号', '收件人', '联系电话', '货架号', '入库时间', '滞留时长', '预警等级', '状态', '操作'].map(h => (
+                {['快递公司', '快递单号', '收件人', '联系电话', '货架号', '入库时间', '滞留时长', '预警等级', '状态', '查询次数', '最后查询', '操作'].map(h => (
                   <th key={h} className="px-4 py-3 text-left font-medium text-slate-500 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.length === 0 ? (
-                <tr><td colSpan={10} className="px-4 py-12 text-center text-slate-400">暂无包裹数据</td></tr>
+                <tr><td colSpan={12} className="px-4 py-12 text-center text-slate-400">暂无包裹数据</td></tr>
               ) : filtered.map(pkg => (
                 <tr key={pkg.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-4 py-3 whitespace-nowrap">{pkg.courierCompany}</td>
@@ -135,6 +135,16 @@ export default function Packages() {
                     <span className={pkg.status === 'picked_up' ? 'badge-green' : 'badge-blue'}>
                       {getStatusLabel(pkg.status)}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-medium ${
+                      pkg.queryCount > 5 ? 'bg-brand-50 text-brand-600' : 'bg-slate-50 text-slate-600'
+                    }`}>
+                      {pkg.queryCount}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-slate-500 text-xs">
+                    {pkg.lastQueriedAt ? formatTime(pkg.lastQueriedAt) : '-'}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     {pkg.status === 'stored' && (

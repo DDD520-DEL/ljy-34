@@ -15,6 +15,8 @@ export interface Package {
   status: PackageStatus
   warningLevel: WarningLevel
   pickupCode: string
+  queryCount: number
+  lastQueriedAt: string | null
 }
 
 export interface WarningRecord {
