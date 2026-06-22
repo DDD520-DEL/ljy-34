@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Plus, Search, X } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
 import { usePackageStore } from '@/store'
 import {
   getRetentionHours,
@@ -59,7 +60,7 @@ export default function Packages() {
       if (a.status !== b.status) return a.status === 'stored' ? -1 : 1
       const wa = WARNING_ORDER[a.warningLevel], wb = WARNING_ORDER[b.warningLevel]
       if (wa !== wb) return wa - wb
-      return new Date(a.storageTime).getTime() - new Date(b.storageTime).getTime()
+      return parseISO(a.storageTime).getTime() - parseISO(b.storageTime).getTime()
     })
     return list
   }, [packages, search, statusFilter, warningFilter])
@@ -72,12 +73,7 @@ export default function Packages() {
   }
 
   const formatTime = (iso: string) => {
-    const d = new Date(iso)
-    const mm = String(d.getMonth() + 1).padStart(2, '0')
-    const dd = String(d.getDate()).padStart(2, '0')
-    const hh = String(d.getHours()).padStart(2, '0')
-    const mi = String(d.getMinutes()).padStart(2, '0')
-    return `${mm}-${dd} ${hh}:${mi}`
+    return format(parseISO(iso), 'MM-dd HH:mm')
   }
 
   return (

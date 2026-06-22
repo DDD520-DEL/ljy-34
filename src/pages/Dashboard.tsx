@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { NavLink } from 'react-router-dom'
-import { format } from 'date-fns'
+import { format, parseISO, isSameDay } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import { PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
 import { Package, Clock, AlertTriangle, CheckCircle, ClipboardCheck, BarChart3 } from 'lucide-react'
@@ -8,12 +8,12 @@ import { usePackageStore } from '@/store'
 import { getWarningLevelLabel } from '@/utils/warning'
 
 export default function Dashboard() {
-  const { packages, dailyStats } = usePackageStore()
+  const { packages, dailyStats, warningRules } = usePackageStore()
 
-  const today = format(new Date(), 'yyyy-MM-dd')
+  const today = new Date()
 
   const stats = useMemo(() => {
-    const storedToday = packages.filter(p => p.storageTime.startsWith(today) && p.status === 'stored').length
+    const storedToday = packages.filter(p => isSameDay(parseISO(p.storageTime), today) && p.status === 'stored').length
     const pending = packages.filter(p => p.status === 'stored').length
     const warning = packages.filter(p => p.warningLevel !== 'none' && p.status === 'stored').length
     const pickedUp = packages.filter(p => p.status === 'picked_up').length
@@ -119,7 +119,7 @@ export default function Dashboard() {
         <div className="card p-5">
           <h2 className="text-base font-semibold text-slate-700 mb-4">预警规则</h2>
           <div className="space-y-3">
-            {usePackageStore(s => s.warningRules).map(r => (
+            {warningRules.map(r => (
               <div key={r.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
                 <div className="flex items-center gap-2">
                   <span className={`w-2.5 h-2.5 rounded-full ${r.level === 'yellow' ? 'bg-amber-400' : r.level === 'orange' ? 'bg-orange-500' : 'bg-red-500'}`} />
@@ -148,7 +148,7 @@ export default function Dashboard() {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#94a3b8' }} tickFormatter={v => v.slice(5)} />
+              <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#94a3b8' }} tickFormatter={(v) => format(parseISO(v), 'MM-dd')} />
               <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} />
               <Tooltip />
               <Area type="monotone" dataKey="storedCount" name="入库" stroke="#5c7cfa" fill="url(#gStored)" strokeWidth={2} />

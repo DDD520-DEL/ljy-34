@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { Keyboard, Hand, ClipboardList, Search, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { usePackageStore } from '@/store'
 import { getRetentionHours, getWarningLevelLabel, maskPhone, getPickupMethodLabel, getWarningLevelBg } from '@/utils/warning'
@@ -50,7 +50,7 @@ export default function Pickup() {
   }
 
   const sortedRecords = [...pickupRecords].sort(
-    (a, b) => new Date(b.pickupTime).getTime() - new Date(a.pickupTime).getTime()
+    (a, b) => parseISO(b.pickupTime).getTime() - parseISO(a.pickupTime).getTime()
   )
 
   return (
@@ -206,7 +206,7 @@ export default function Pickup() {
                   <tr key={record.id} className="border-t border-slate-100 hover:bg-slate-50">
                     <td className="py-3 px-4 text-slate-800">{pkg?.recipientName ?? '-'}</td>
                     <td className="py-3 px-4 text-slate-600">{pkg?.courierCompany ?? '-'}</td>
-                    <td className="py-3 px-4 text-slate-600">{format(new Date(record.pickupTime), 'MM-dd HH:mm')}</td>
+                    <td className="py-3 px-4 text-slate-600">{format(parseISO(record.pickupTime), 'MM-dd HH:mm')}</td>
                     <td className="py-3 px-4 text-slate-600">{getPickupMethodLabel(record.pickupMethod)}</td>
                     <td className="py-3 px-4 text-slate-600">{pkg?.shelfNumber ?? '-'}</td>
                   </tr>

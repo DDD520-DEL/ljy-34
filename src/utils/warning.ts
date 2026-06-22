@@ -1,8 +1,8 @@
-import { differenceInMinutes, differenceInHours } from 'date-fns'
+import { differenceInMinutes, differenceInHours, parseISO } from 'date-fns'
 import type { WarningLevel, Package, WarningRule } from '@/types'
 
 export function calculateWarningLevel(storageTime: string, rules: WarningRule[]): WarningLevel {
-  const hours = differenceInHours(new Date(), new Date(storageTime))
+  const hours = differenceInHours(new Date(), parseISO(storageTime))
   const enabledRules = rules.filter(r => r.enabled).sort((a, b) => b.thresholdHours - a.thresholdHours)
 
   for (const rule of enabledRules) {
@@ -14,11 +14,11 @@ export function calculateWarningLevel(storageTime: string, rules: WarningRule[])
 }
 
 export function getRetentionHours(storageTime: string): number {
-  return differenceInHours(new Date(), new Date(storageTime))
+  return differenceInHours(new Date(), parseISO(storageTime))
 }
 
 export function getRetentionMinutes(storageTime: string): number {
-  return differenceInMinutes(new Date(), new Date(storageTime))
+  return differenceInMinutes(new Date(), parseISO(storageTime))
 }
 
 export function formatRetentionPolicy(hours: number): string {

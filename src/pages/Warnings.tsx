@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { AlertTriangle, Bell, Smartphone, Clock, Send, MessageSquare, Save } from 'lucide-react'
+import { parseISO } from 'date-fns'
 import { usePackageStore } from '@/store'
 import {
   getRetentionHours,
@@ -36,7 +37,7 @@ export default function Warnings() {
   const filtered = levelFilter === 'all' ? warningPackages : warningPackages.filter(p => p.warningLevel === levelFilter)
 
   const sortedNotifications = [...notifications].sort(
-    (a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime()
+    (a, b) => parseISO(b.sentAt).getTime() - parseISO(a.sentAt).getTime()
   )
 
   return (
@@ -194,7 +195,7 @@ export default function Warnings() {
                         </span>
                       </div>
                       <p className="text-sm text-slate-500 leading-relaxed truncate">{n.content}</p>
-                      <p className="text-xs text-slate-400 mt-1">{new Date(n.sentAt).toLocaleString('zh-CN')}</p>
+                      <p className="text-xs text-slate-400 mt-1">{parseISO(n.sentAt).toLocaleString('zh-CN')}</p>
                     </div>
                   </div>
                 ))}

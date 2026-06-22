@@ -1,4 +1,4 @@
-import { format, subDays, subHours, subMinutes } from 'date-fns'
+import { format, subDays, subHours, subMinutes, parseISO } from 'date-fns'
 import type { Package, WarningRecord, Notification, PickupRecord, DailyStats } from '@/types'
 
 const now = new Date()
@@ -119,7 +119,7 @@ export function generateMockWarningRecords(packages: Package[]): WarningRecord[]
         id: generateId(),
         packageId: pkg.id,
         level,
-        triggeredAt: subHours(new Date(pkg.storageTime), level === 'yellow' ? -24 : level === 'orange' ? -48 : -72).toISOString(),
+        triggeredAt: subHours(parseISO(pkg.storageTime), level === 'yellow' ? -24 : level === 'orange' ? -48 : -72).toISOString(),
         notified: true,
       })
     })
@@ -180,7 +180,7 @@ export function generateMockPickupRecords(packages: Package[]): PickupRecord[] {
   return pickedUp.map(pkg => ({
     id: generateId(),
     packageId: pkg.id,
-    pickupTime: subHours(new Date(pkg.storageTime), -(Math.floor(Math.random() * 12) + 1)).toISOString(),
+    pickupTime: subHours(parseISO(pkg.storageTime), -(Math.floor(Math.random() * 12) + 1)).toISOString(),
     pickupMethod: (['code', 'manual', 'batch'] as const)[Math.floor(Math.random() * 3)],
     operatorId: 'admin',
   }))
@@ -191,7 +191,7 @@ export function generateMockDailyStats(): DailyStats[] {
   for (let i = 6; i >= 0; i--) {
     const date = subDays(now, i)
     stats.push({
-      date: format(date, 'MM-dd'),
+      date: format(date, 'yyyy-MM-dd'),
       storedCount: Math.floor(Math.random() * 15) + 5,
       pickedUpCount: Math.floor(Math.random() * 12) + 3,
       notificationCount: Math.floor(Math.random() * 8) + 2,

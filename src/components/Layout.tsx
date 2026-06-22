@@ -1,3 +1,4 @@
+import { parseISO } from 'date-fns'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
@@ -35,7 +36,7 @@ export default function Layout() {
   const totalWarnings = yellowCount + orangeCount + redCount
 
   const recentNotifications = [...notifications].sort(
-    (a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime()
+    (a, b) => parseISO(b.sentAt).getTime() - parseISO(a.sentAt).getTime()
   ).slice(0, 8)
 
   return (
@@ -145,7 +146,7 @@ export default function Layout() {
                             <div className="flex-1 min-w-0">
                               <p className="text-xs text-slate-700 leading-relaxed">{n.content.substring(0, 50)}...</p>
                               <p className="text-[10px] text-slate-400 mt-1">
-                                {new Date(n.sentAt).toLocaleString('zh-CN')}
+                                {parseISO(n.sentAt).toLocaleString('zh-CN')}
                               </p>
                             </div>
                           </div>

@@ -8,11 +8,16 @@ import Pickup from '@/pages/Pickup'
 import Statistics from '@/pages/Statistics'
 import { usePackageStore } from '@/store'
 
+function isLegacyDateFormat(dailyStats: { date: string }[]): boolean {
+  if (dailyStats.length === 0) return false
+  return dailyStats[0].date.length === 5
+}
+
 export default function App() {
-  const { packages, updateWarningLevels, initMockData } = usePackageStore()
+  const { packages, dailyStats, updateWarningLevels, initMockData } = usePackageStore()
 
   useEffect(() => {
-    if (packages.length === 0) {
+    if (packages.length === 0 || isLegacyDateFormat(dailyStats)) {
       initMockData()
     }
   }, [])

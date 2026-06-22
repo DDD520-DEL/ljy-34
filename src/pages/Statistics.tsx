@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react'
 import { usePackageStore } from '@/store'
-import { getRetentionHours, formatRetentionPolicy, getWarningLevelLabel } from '@/utils/warning'
+import { getRetentionHours, formatRetentionPolicy } from '@/utils/warning'
 import {
   BarChart, AreaChart, ResponsiveContainer, XAxis, YAxis, Tooltip,
   CartesianGrid, Bar, Area, Legend, Cell,
 } from 'recharts'
 import { Clock, AlertTriangle, Package, BarChart3, TrendingUp, ClipboardList } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 
 type TabKey = 'retention' | 'warning' | 'workload'
 
@@ -42,7 +42,7 @@ export default function Statistics() {
 
   const warningChartData = useMemo(() =>
     dailyStats.map(s => ({
-      date: format(new Date(s.date), 'MM/dd'),
+      date: format(parseISO(s.date), 'MM/dd'),
       yellowCount: s.yellowCount,
       orangeCount: s.orangeCount,
       redCount: s.redCount,
@@ -52,7 +52,7 @@ export default function Statistics() {
   const workloadData = useMemo(() => {
     const last7 = dailyStats.slice(-7)
     const chartData = last7.map(s => ({
-      date: format(new Date(s.date), 'MM/dd'),
+      date: format(parseISO(s.date), 'MM/dd'),
       storedCount: s.storedCount,
       pickedUpCount: s.pickedUpCount,
     }))
