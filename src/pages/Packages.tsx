@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react'
-import { Plus, Search, X } from 'lucide-react'
+import { Plus, Search, X, RotateCcw } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { usePackageStore } from '@/store'
 import {
   getRetentionHours,
   getWarningLevelLabel,
-  getWarningLevelBg,
   getStatusLabel,
+  getReturnReasonLabel,
   maskPhone,
   formatRetentionPolicy,
 } from '@/utils/warning'
@@ -39,7 +39,7 @@ const emptyForm: FormData = {
 }
 
 export default function Packages() {
-  const { packages, addPackage, pickupPackage } = usePackageStore()
+  const { packages, addPackage, pickupPackage, confirmReturn } = usePackageStore()
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState<FormData>(emptyForm)
   const [search, setSearch] = useState('')
@@ -57,7 +57,13 @@ export default function Packages() {
     if (statusFilter !== 'all') list = list.filter(p => p.status === statusFilter)
     if (warningFilter !== 'all') list = list.filter(p => p.warningLevel === warningFilter)
     list.sort((a, b) => {
-      if (a.status !== b.status) return a.status === 'stored' ? -1 : 1
+      const statusOrder: Record<Package['status'], number> = {
+        pending_return: 0,
+        stored: 1,
+        picked_up: 2,
+        returned: 3,
+      }
+      if (a.status !== b.status) return statusOrder[a.status] - statusOrder[b.status]
       const wa = WARNING_ORDER[a.warningLevel], wb = WARNING_ORDER[b.warningLevel]
       if (wa !== wb) return wa - wb
       return parseISO(a.storageTime).getTime() - parseISO(b.storageTime).getTime()
@@ -74,6 +80,15 @@ export default function Packages() {
 
   const formatTime = (iso: string) => {
     return format(parseISO(iso), 'MM-dd HH:mm')
+  }
+
+  const getStatusBadgeClass = (status: Package['status']) => {
+    switch (status) {
+      case 'stored': return 'badge-blue'
+      case 'picked_up': return 'badge-green'
+      case 'pending_return': return 'badge-red'
+      case 'returned': return 'badge-gray'
+    }
   }
 
   return (
@@ -96,7 +111,9 @@ export default function Packages() {
         <select className="input-field w-32" value={statusFilter} onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}>
           <option value="all">全部状态</option>
           <option value="stored">待取件</option>
+          <option value="pending_return">待退回</option>
           <option value="picked_up">已签收</option>
+          <option value="returned">已退回</option>
         </select>
         <select className="input-field w-32" value={warningFilter} onChange={e => setWarningFilter(e.target.value as typeof warningFilter)}>
           <option value="all">全部预警</option>
@@ -111,14 +128,14 @@ export default function Packages() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200/60">
-                {['快递公司', '快递单号', '收件人', '联系电话', '货架号', '入库时间', '滞留时长', '预警等级', '状态', '查询次数', '最后查询', '操作'].map(h => (
+                {['快递公司', '快递单号', '收件人', '联系电话', '货架号', '入库时间', '滞留时长', '预警等级', '状态', '退回原因', '查询次数', '最后查询', '操作'].map(h => (
                   <th key={h} className="px-4 py-3 text-left font-medium text-slate-500 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.length === 0 ? (
-                <tr><td colSpan={12} className="px-4 py-12 text-center text-slate-400">暂无包裹数据</td></tr>
+                <tr><td colSpan={13} className="px-4 py-12 text-center text-slate-400">暂无包裹数据</td></tr>
               ) : filtered.map(pkg => (
                 <tr key={pkg.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-4 py-3 whitespace-nowrap">{pkg.courierCompany}</td>
@@ -132,9 +149,12 @@ export default function Packages() {
                     <span className={WARNING_BADGE[pkg.warningLevel]}>{getWarningLevelLabel(pkg.warningLevel)}</span>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={pkg.status === 'picked_up' ? 'badge-green' : 'badge-blue'}>
+                    <span className={getStatusBadgeClass(pkg.status)}>
                       {getStatusLabel(pkg.status)}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-slate-500 text-xs">
+                    {pkg.returnReason ? getReturnReasonLabel(pkg.returnReason) : '-'}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-medium ${
@@ -148,10 +168,27 @@ export default function Packages() {
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     {pkg.status === 'stored' && (
-                      <button
-                        className="text-brand-600 hover:text-brand-700 text-sm font-medium"
-                        onClick={() => pickupPackage(pkg.id, 'manual')}
-                      >签收</button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="text-brand-600 hover:text-brand-700 text-sm font-medium"
+                          onClick={() => pickupPackage(pkg.id, 'manual')}
+                        >签收</button>
+                      </div>
+                    )}
+                    {pkg.status === 'pending_return' && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="text-brand-600 hover:text-brand-700 text-sm font-medium"
+                          onClick={() => pickupPackage(pkg.id, 'manual')}
+                        >签收</button>
+                        <button
+                          className="flex items-center gap-1 text-red-600 hover:text-red-700 text-sm font-medium"
+                          onClick={() => confirmReturn(pkg.id, 'overdue')}
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          确认退回
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>

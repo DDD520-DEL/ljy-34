@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { AlertTriangle, Bell, Smartphone, Clock, Send, MessageSquare, Save } from 'lucide-react'
-import { parseISO } from 'date-fns'
+import { AlertTriangle, Bell, Smartphone, Clock, Send, MessageSquare, Save, RotateCcw, History, CheckSquare, Settings, RefreshCw } from 'lucide-react'
+import { parseISO, format } from 'date-fns'
 import { usePackageStore } from '@/store'
 import {
   getRetentionHours,
@@ -9,16 +9,21 @@ import {
   maskPhone,
   formatRetentionPolicy,
   getNotificationChannelLabel,
+  getReturnReasonLabel,
+  getStatusBg,
+  getStatusLabel,
 } from '@/utils/warning'
 import type { WarningLevel, WarningRule, NotificationChannel } from '@/types'
 
-type MainTab = 'list' | 'rules' | 'notifications'
+type MainTab = 'list' | 'returns' | 'returnHistory' | 'rules' | 'notifications'
 type LevelFilter = 'all' | WarningLevel
 
-const mainTabs: { key: MainTab; label: string }[] = [
-  { key: 'list', label: '预警列表' },
-  { key: 'rules', label: '预警规则' },
-  { key: 'notifications', label: '通知记录' },
+const mainTabs: { key: MainTab; label: string; icon: React.ReactNode }[] = [
+  { key: 'list', label: '预警列表', icon: <AlertTriangle className="w-4 h-4" /> },
+  { key: 'returns', label: '退回任务', icon: <RotateCcw className="w-4 h-4" /> },
+  { key: 'returnHistory', label: '退回记录', icon: <History className="w-4 h-4" /> },
+  { key: 'rules', label: '预警规则', icon: <Settings className="w-4 h-4" /> },
+  { key: 'notifications', label: '通知记录', icon: <Bell className="w-4 h-4" /> },
 ]
 
 const levelFilters: { key: LevelFilter; label: string }[] = [
@@ -31,14 +36,44 @@ const levelFilters: { key: LevelFilter; label: string }[] = [
 export default function Warnings() {
   const [mainTab, setMainTab] = useState<MainTab>('list')
   const [levelFilter, setLevelFilter] = useState<LevelFilter>('all')
-  const { packages, notifications, warningRules, sendNotification, updateWarningRule } = usePackageStore()
+  const [selectedReturnIds, setSelectedReturnIds] = useState<string[]>([])
+  const { packages, notifications, warningRules, returnRecords, sendNotification, updateWarningRule, confirmReturn, batchConfirmReturn, checkOverduePackages, maxRetentionDays, setMaxRetentionDays } = usePackageStore()
 
   const warningPackages = packages.filter(p => p.status === 'stored' && p.warningLevel !== 'none')
   const filtered = levelFilter === 'all' ? warningPackages : warningPackages.filter(p => p.warningLevel === levelFilter)
 
+  const pendingReturnPackages = packages.filter(p => p.status === 'pending_return')
+
   const sortedNotifications = [...notifications].sort(
     (a, b) => parseISO(b.sentAt).getTime() - parseISO(a.sentAt).getTime()
   )
+
+  const sortedReturnRecords = [...returnRecords].sort(
+    (a, b) => parseISO(b.returnedAt).getTime() - parseISO(a.returnedAt).getTime()
+  )
+
+  const toggleSelectReturn = (id: string) => {
+    setSelectedReturnIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    )
+  }
+
+  const selectAllReturns = () => {
+    if (selectedReturnIds.length === pendingReturnPackages.length) {
+      setSelectedReturnIds([])
+    } else {
+      setSelectedReturnIds(pendingReturnPackages.map(p => p.id))
+    }
+  }
+
+  const handleBatchReturn = () => {
+    if (selectedReturnIds.length > 0) {
+      batchConfirmReturn(selectedReturnIds)
+      setSelectedReturnIds([])
+    }
+  }
+
+  const [retentionDays, setRetentionDays] = useState(maxRetentionDays)
 
   return (
     <div className="space-y-6">
@@ -48,47 +83,62 @@ export default function Warnings() {
         </div>
         <div>
           <h1 className="text-xl font-semibold text-slate-800">预警中心</h1>
-          <p className="text-sm text-slate-500">管理包裹滞留预警与通知</p>
+          <p className="text-sm text-slate-500">管理包裹滞留预警与退回处理</p>
         </div>
       </div>
 
-      <div className="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit">
+      <div className="flex flex-wrap gap-1 bg-slate-100 rounded-lg p-1 w-fit">
         {mainTabs.map(tab => (
           <button
             key={tab.key}
             onClick={() => setMainTab(tab.key)}
-            className={`px-4 py-2 text-sm rounded-md transition-all ${
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm rounded-md transition-all ${
               mainTab === tab.key
                 ? 'bg-white text-slate-800 font-medium shadow-sm'
                 : 'text-slate-500 hover:text-slate-700'
             }`}
           >
+            {tab.icon}
             {tab.label}
+            {tab.key === 'returns' && pendingReturnPackages.length > 0 && (
+              <span className="ml-1 inline-flex items-center justify-center w-5 h-5 text-xs font-medium rounded-full bg-red-500 text-white">
+                {pendingReturnPackages.length}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
       {mainTab === 'list' && (
         <div className="space-y-4">
-          <div className="flex gap-2">
-            {levelFilters.map(lf => (
-              <button
-                key={lf.key}
-                onClick={() => setLevelFilter(lf.key)}
-                className={`px-3 py-1.5 text-xs rounded-full border transition-all ${
-                  levelFilter === lf.key
-                    ? 'bg-brand-500/10 border-brand-500/30 text-brand-600 font-medium'
-                    : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
-                }`}
-              >
-                {lf.label}
-                {lf.key !== 'all' && (
-                  <span className="ml-1">
-                    ({warningPackages.filter(p => p.warningLevel === lf.key).length})
-                  </span>
-                )}
-              </button>
-            ))}
+          <div className="flex items-center justify-between">
+            <div className="flex gap-2">
+              {levelFilters.map(lf => (
+                <button
+                  key={lf.key}
+                  onClick={() => setLevelFilter(lf.key)}
+                  className={`px-3 py-1.5 text-xs rounded-full border transition-all ${
+                    levelFilter === lf.key
+                      ? 'bg-brand-500/10 border-brand-500/30 text-brand-600 font-medium'
+                      : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                  }`}
+                >
+                  {lf.label}
+                  {lf.key !== 'all' && (
+                    <span className="ml-1">
+                      ({warningPackages.filter(p => p.warningLevel === lf.key).length})
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => checkOverduePackages()}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-blue-500/10 text-blue-600 rounded-lg hover:bg-blue-500/20 transition-colors"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              刷新预警状态
+            </button>
           </div>
 
           {filtered.length === 0 ? (
@@ -147,11 +197,199 @@ export default function Warnings() {
         </div>
       )}
 
+      {mainTab === 'returns' && (
+        <div className="space-y-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <RotateCcw className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-amber-800">超期退回处理说明</p>
+                <p className="text-xs text-amber-700 mt-1">
+                  包裹滞留超过 <span className="font-semibold">{maxRetentionDays}天</span> 将自动标记为待退回。
+                  确认退回后，包裹将从活跃列表移除并保留在历史退回记录中。
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {pendingReturnPackages.length > 0 && (
+            <div className="flex items-center justify-between bg-white rounded-xl border border-slate-200/60 p-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedReturnIds.length === pendingReturnPackages.length && pendingReturnPackages.length > 0}
+                  onChange={selectAllReturns}
+                  className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                />
+                <span className="text-sm text-slate-600">
+                  全选（已选 {selectedReturnIds.length}/{pendingReturnPackages.length}）
+                </span>
+              </label>
+              <button
+                onClick={handleBatchReturn}
+                disabled={selectedReturnIds.length === 0}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <CheckSquare className="w-4 h-4" />
+                批量确认退回
+              </button>
+            </div>
+          )}
+
+          {pendingReturnPackages.length === 0 ? (
+            <div className="text-center py-16 text-slate-400">
+              <RotateCcw className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p>暂无待退回包裹</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pendingReturnPackages.map(pkg => (
+                <div
+                  key={pkg.id}
+                  className={`bg-white rounded-xl border p-4 hover:shadow-sm transition-shadow ${
+                    selectedReturnIds.includes(pkg.id) ? 'border-red-300 bg-red-50/30' : 'border-slate-200/60'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedReturnIds.includes(pkg.id)}
+                        onChange={() => toggleSelectReturn(pkg.id)}
+                        className="mt-1 w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                      />
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-slate-800">{pkg.recipientName}</span>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusBg(pkg.status)}`}>
+                            {getStatusLabel(pkg.status)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-slate-500">
+                          <span>{pkg.courierCompany}</span>
+                          <span className="font-mono text-xs">...{pkg.trackingNumber.slice(-6)}</span>
+                          <span>货架 {pkg.shelfNumber}</span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5" />
+                            滞留 {formatRetentionPolicy(getRetentionHours(pkg.storageTime))}
+                          </span>
+                          <span>{maskPhone(pkg.recipientPhone)}</span>
+                        </div>
+                        {pkg.markedForReturnAt && (
+                          <p className="text-xs text-slate-400">
+                            标记退回时间：{format(parseISO(pkg.markedForReturnAt), 'yyyy-MM-dd HH:mm')}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => sendNotification(pkg.id, 'both')}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-orange-500/10 text-orange-600 rounded-lg hover:bg-orange-500/20 transition-colors"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        提醒收件人
+                      </button>
+                      <button
+                        onClick={() => confirmReturn(pkg.id, 'overdue')}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                      >
+                        <CheckSquare className="w-3.5 h-3.5" />
+                        确认退回
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {mainTab === 'returnHistory' && (
+        <div className="bg-white rounded-xl border border-slate-200/60 overflow-hidden">
+          {sortedReturnRecords.length === 0 ? (
+            <div className="text-center py-16 text-slate-400">
+              <History className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p>暂无退回记录</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200/60">
+                    {['收件人', '联系电话', '快递公司', '快递单号', '货架号', '入库时间', '滞留时长', '退回原因', '退回时间'].map(h => (
+                      <th key={h} className="px-4 py-3 text-left font-medium text-slate-500 whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {sortedReturnRecords.map(record => (
+                    <tr key={record.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-4 py-3 whitespace-nowrap font-medium text-slate-700">{record.recipientName}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">{maskPhone(record.recipientPhone)}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">{record.courierCompany}</td>
+                      <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">...{record.trackingNumber.slice(-6)}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">{record.shelfNumber}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-500">
+                        {format(parseISO(record.storageTime), 'MM-dd HH:mm')}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-500">
+                        {formatRetentionPolicy(record.retentionHours)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+                          {getReturnReasonLabel(record.returnReason)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-500">
+                        {format(parseISO(record.returnedAt), 'MM-dd HH:mm')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {mainTab === 'rules' && (
-        <div className="grid gap-4 sm:grid-cols-3">
-          {warningRules.map(rule => (
-            <RuleCard key={rule.id} rule={rule} onSave={updateWarningRule} />
-          ))}
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl border border-slate-200/60 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-700">超期退回设置</h3>
+                <p className="text-xs text-slate-500 mt-1">设置包裹最大保留天数，超过后自动标记为待退回</p>
+              </div>
+            </div>
+            <div className="flex items-end gap-4">
+              <div className="flex-1 max-w-xs">
+                <label className="block text-xs text-slate-500 mb-1">最大保留天数</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={retentionDays}
+                  onChange={e => setRetentionDays(Number(e.target.value))}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
+                />
+              </div>
+              <button
+                onClick={() => setMaxRetentionDays(retentionDays)}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors"
+              >
+                <Save className="w-4 h-4" />
+                保存设置
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            {warningRules.map(rule => (
+              <RuleCard key={rule.id} rule={rule} onSave={updateWarningRule} />
+            ))}
+          </div>
         </div>
       )}
 

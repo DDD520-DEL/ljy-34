@@ -1,29 +1,41 @@
-import { useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import { format, parseISO, isSameDay } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
-import { PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
-import { Package, Clock, AlertTriangle, CheckCircle, ClipboardCheck, BarChart3 } from 'lucide-react'
+import { PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
+import { Package, Clock, AlertTriangle, CheckCircle, ClipboardCheck, BarChart3, RotateCcw } from 'lucide-react'
 import { usePackageStore } from '@/store'
 import { getWarningLevelLabel } from '@/utils/warning'
 
 export default function Dashboard() {
-  const { packages, dailyStats, warningRules } = usePackageStore()
+  const { packages, dailyStats, warningRules, updateWarningLevels, checkOverduePackages } = usePackageStore()
 
   const today = new Date()
+
+  useEffect(() => {
+    updateWarningLevels()
+    const interval = setInterval(() => {
+      checkOverduePackages()
+    }, 60000)
+    return () => clearInterval(interval)
+  }, [updateWarningLevels, checkOverduePackages])
 
   const stats = useMemo(() => {
     const storedToday = packages.filter(p => isSameDay(parseISO(p.storageTime), today) && p.status === 'stored').length
     const pending = packages.filter(p => p.status === 'stored').length
+    const pendingReturn = packages.filter(p => p.status === 'pending_return').length
     const warning = packages.filter(p => p.warningLevel !== 'none' && p.status === 'stored').length
     const pickedUp = packages.filter(p => p.status === 'picked_up').length
-    return { storedToday, pending, warning, pickedUp }
+    const returned = packages.filter(p => p.status === 'returned').length
+    return { storedToday, pending, pendingReturn, warning, pickedUp, returned }
   }, [packages, today])
 
   const warningData = useMemo(() => {
     const counts = { yellow: 0, orange: 0, red: 0 }
     packages.forEach(p => {
-      if (p.warningLevel !== 'none' && p.status === 'stored') counts[p.warningLevel]++
+      if (p.warningLevel !== 'none' && (p.status === 'stored' || p.status === 'pending_return')) {
+        counts[p.warningLevel]++
+      }
     })
     return [
       { name: getWarningLevelLabel('yellow'), value: counts.yellow, color: '#F59E0B' },
@@ -32,11 +44,21 @@ export default function Dashboard() {
     ].filter(d => d.value > 0)
   }, [packages])
 
+  const trendData = useMemo(() => {
+    return dailyStats.map(s => ({
+      date: s.date,
+      storedCount: s.storedCount,
+      pickedUpCount: s.pickedUpCount,
+      returnedCount: s.returnedCount,
+    }))
+  }, [dailyStats])
+
   const totalWarning = warningData.reduce((s, d) => s + d.value, 0)
 
   const cards = [
     { label: '今日入库', value: stats.storedToday, icon: Package, cls: 'stat-card-blue', iconColor: 'text-brand-500' },
     { label: '待取件', value: stats.pending, icon: Clock, cls: 'stat-card-yellow', iconColor: 'text-amber-500' },
+    { label: '待退回', value: stats.pendingReturn, icon: RotateCcw, cls: 'stat-card-red', iconColor: 'text-red-500' },
     { label: '预警包裹', value: stats.warning, icon: AlertTriangle, cls: 'stat-card-orange', iconColor: 'text-orange-500' },
     { label: '已签收', value: stats.pickedUp, icon: CheckCircle, cls: 'stat-card-green', iconColor: 'text-emerald-500' },
   ]
@@ -57,7 +79,7 @@ export default function Dashboard() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {cards.map(c => (
           <div key={c.label} className={`stat-card ${c.cls}`}>
             <c.icon className={`w-5 h-5 ${c.iconColor}`} />
@@ -133,10 +155,10 @@ export default function Dashboard() {
       </div>
 
       <div className="card p-5">
-        <h2 className="text-base font-semibold text-slate-700 mb-4">滞留趋势</h2>
+        <h2 className="text-base font-semibold text-slate-700 mb-4">入库/签收/退回趋势</h2>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={dailyStats}>
+            <AreaChart data={trendData}>
               <defs>
                 <linearGradient id="gStored" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#5c7cfa" stopOpacity={0.2} />
@@ -146,13 +168,19 @@ export default function Dashboard() {
                   <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
                   <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                 </linearGradient>
+                <linearGradient id="gReturned" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#94a3b8' }} tickFormatter={(v) => format(parseISO(v), 'MM-dd')} />
               <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} />
               <Tooltip />
+              <Legend />
               <Area type="monotone" dataKey="storedCount" name="入库" stroke="#5c7cfa" fill="url(#gStored)" strokeWidth={2} />
               <Area type="monotone" dataKey="pickedUpCount" name="签收" stroke="#10b981" fill="url(#gPicked)" strokeWidth={2} />
+              <Area type="monotone" dataKey="returnedCount" name="退回" stroke="#ef4444" fill="url(#gReturned)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { Keyboard, Hand, ClipboardList, Search, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { Keyboard, Hand, ClipboardList, Search, CheckCircle2, AlertTriangle, RotateCcw } from 'lucide-react'
 import { usePackageStore } from '@/store'
 import { getRetentionHours, getWarningLevelLabel, maskPhone, getPickupMethodLabel, getWarningLevelBg } from '@/utils/warning'
 
@@ -29,7 +29,11 @@ export default function Pickup() {
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
       return next
     })
   }
@@ -194,8 +198,9 @@ export default function Pickup() {
               <tr className="bg-slate-50 text-slate-600">
                 <th className="text-left py-3 px-4 font-medium">收件人</th>
                 <th className="text-left py-3 px-4 font-medium">快递公司</th>
-                <th className="text-left py-3 px-4 font-medium">签收时间</th>
-                <th className="text-left py-3 px-4 font-medium">签收方式</th>
+                <th className="text-left py-3 px-4 font-medium">时间</th>
+                <th className="text-left py-3 px-4 font-medium">类型</th>
+                <th className="text-left py-3 px-4 font-medium">方式</th>
                 <th className="text-left py-3 px-4 font-medium">货架号</th>
               </tr>
             </thead>
@@ -207,6 +212,19 @@ export default function Pickup() {
                     <td className="py-3 px-4 text-slate-800">{pkg?.recipientName ?? '-'}</td>
                     <td className="py-3 px-4 text-slate-600">{pkg?.courierCompany ?? '-'}</td>
                     <td className="py-3 px-4 text-slate-600">{format(parseISO(record.pickupTime), 'MM-dd HH:mm')}</td>
+                    <td className="py-3 px-4">
+                      {record.isReturn ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 border border-red-200 text-red-700">
+                          <RotateCcw className="w-3 h-3" />
+                          退回
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 border border-emerald-200 text-emerald-700">
+                          <CheckCircle2 className="w-3 h-3" />
+                          正常签收
+                        </span>
+                      )}
+                    </td>
                     <td className="py-3 px-4 text-slate-600">{getPickupMethodLabel(record.pickupMethod)}</td>
                     <td className="py-3 px-4 text-slate-600">{pkg?.shelfNumber ?? '-'}</td>
                   </tr>
@@ -214,7 +232,7 @@ export default function Pickup() {
               })}
               {sortedRecords.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-slate-400">暂无签收记录</td>
+                  <td colSpan={6} className="py-12 text-center text-slate-400">暂无签收记录</td>
                 </tr>
               )}
             </tbody>

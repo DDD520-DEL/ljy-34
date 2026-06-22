@@ -21,6 +21,8 @@ const WARNING_STYLE: Record<string, string> = {
 const STATUS_STYLE: Record<string, string> = {
   stored: 'bg-blue-50 border-blue-200 text-blue-700',
   picked_up: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+  pending_return: 'bg-red-50 border-red-200 text-red-700',
+  returned: 'bg-slate-50 border-slate-200 text-slate-600',
 }
 
 export default function PackageQuery() {
@@ -131,6 +133,8 @@ export default function PackageQuery() {
 
 function PackageCard({ pkg, formatTime }: { pkg: PackageType; formatTime: (iso: string) => string }) {
   const isStored = pkg.status === 'stored'
+  const isPendingReturn = pkg.status === 'pending_return'
+  const isReturned = pkg.status === 'returned'
   return (
     <div className="card overflow-hidden">
       <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
@@ -141,8 +145,10 @@ function PackageCard({ pkg, formatTime }: { pkg: PackageType; formatTime: (iso: 
           </span>
         </div>
         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${STATUS_STYLE[pkg.status]}`}>
-          {pkg.status === 'stored' ? (
+          {isStored ? (
             <><Clock className="w-3 h-3 mr-1" />{getStatusLabel(pkg.status)}</>
+          ) : isPendingReturn ? (
+            <><AlertTriangle className="w-3 h-3 mr-1" />{getStatusLabel(pkg.status)}</>
           ) : (
             <><CheckCircle className="w-3 h-3 mr-1" />{getStatusLabel(pkg.status)}</>
           )}
@@ -164,6 +170,14 @@ function PackageCard({ pkg, formatTime }: { pkg: PackageType; formatTime: (iso: 
               </p>
             </div>
           )}
+          {isPendingReturn && (
+            <div className="text-right">
+              <p className="text-sm text-slate-500 mb-0.5">取件码</p>
+              <p className="font-mono text-2xl font-bold text-red-600 tracking-wider">
+                {pkg.pickupCode}
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -172,12 +186,12 @@ function PackageCard({ pkg, formatTime }: { pkg: PackageType; formatTime: (iso: 
               <MapPin className="w-3.5 h-3.5" />
               货架位置
             </div>
-            <p className="font-semibold text-slate-800 text-lg">{pkg.shelfNumber}</p>
+            <p className="font-semibold text-slate-800 text-lg">{isReturned ? '已退回' : pkg.shelfNumber}</p>
           </div>
           <div className="rounded-lg border border-slate-200 p-3 bg-slate-50/50">
             <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
               <Clock className="w-3.5 h-3.5" />
-              已滞留时长
+              {isReturned ? '滞留总时长' : '已滞留时长'}
             </div>
             <p className="font-semibold text-slate-800 text-lg">
               {formatRetentionPolicy(getRetentionHours(pkg.storageTime))}
@@ -197,6 +211,31 @@ function PackageCard({ pkg, formatTime }: { pkg: PackageType; formatTime: (iso: 
             </span>
           )}
         </div>
+
+        {isPendingReturn && (
+          <div className="rounded-lg p-3 text-sm border bg-red-50 border-red-200 text-red-700">
+            <p className="font-medium mb-0.5 flex items-center gap-1">
+              <AlertTriangle className="w-4 h-4" />
+              包裹超期待退回
+            </p>
+            <p className="opacity-90">
+              您的包裹已滞留超过7天，系统已将其标记为待退回。如需取件请尽快联系代收点工作人员，
+              否则包裹将被退回给寄件人。
+            </p>
+          </div>
+        )}
+
+        {isReturned && (
+          <div className="rounded-lg p-3 text-sm border bg-slate-50 border-slate-200 text-slate-600">
+            <p className="font-medium mb-0.5 flex items-center gap-1">
+              <CheckCircle className="w-4 h-4" />
+              包裹已退回
+            </p>
+            <p className="opacity-90">
+              该包裹因超期未取已被退回给寄件人，如有疑问请联系代收点工作人员。
+            </p>
+          </div>
+        )}
 
         {pkg.warningLevel !== 'none' && isStored && (
           <div className={`rounded-lg p-3 text-sm border ${WARNING_STYLE[pkg.warningLevel]}`}>

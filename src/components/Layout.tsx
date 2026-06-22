@@ -15,7 +15,6 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import { usePackageStore } from '@/store'
-import { getWarningLevelLabel } from '@/utils/warning'
 import Toast from '@/components/Toast'
 
 const navItems = [

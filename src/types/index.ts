@@ -1,8 +1,9 @@
 export type WarningLevel = 'none' | 'yellow' | 'orange' | 'red'
-export type PackageStatus = 'stored' | 'picked_up'
+export type PackageStatus = 'stored' | 'picked_up' | 'pending_return' | 'returned'
 export type NotificationChannel = 'in_app' | 'sms' | 'both'
 export type NotificationStatus = 'sent' | 'delivered' | 'failed'
 export type PickupMethod = 'code' | 'manual' | 'batch'
+export type ReturnReason = 'overdue' | 'damaged' | 'recipient_refused' | 'other'
 
 export interface Package {
   id: string
@@ -17,6 +18,9 @@ export interface Package {
   pickupCode: string
   queryCount: number
   lastQueriedAt: string | null
+  markedForReturnAt?: string | null
+  returnedAt?: string | null
+  returnReason?: ReturnReason | null
 }
 
 export interface WarningRecord {
@@ -44,6 +48,23 @@ export interface PickupRecord {
   pickupTime: string
   pickupMethod: PickupMethod
   operatorId: string
+  isReturn: boolean
+}
+
+export interface ReturnRecord {
+  id: string
+  packageId: string
+  recipientName: string
+  recipientPhone: string
+  courierCompany: string
+  trackingNumber: string
+  shelfNumber: string
+  storageTime: string
+  markedForReturnAt: string
+  returnedAt: string
+  returnReason: ReturnReason
+  operatorId: string
+  retentionHours: number
 }
 
 export interface WarningRule {
@@ -58,6 +79,7 @@ export interface DailyStats {
   date: string
   storedCount: number
   pickedUpCount: number
+  returnedCount: number
   notificationCount: number
   yellowCount: number
   orangeCount: number

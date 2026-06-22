@@ -59,6 +59,36 @@ export function getStatusLabel(status: Package['status']): string {
   switch (status) {
     case 'stored': return '待取件'
     case 'picked_up': return '已签收'
+    case 'pending_return': return '待退回'
+    case 'returned': return '已退回'
+  }
+}
+
+export function getReturnReasonLabel(reason: string): string {
+  switch (reason) {
+    case 'overdue': return '超期未取'
+    case 'damaged': return '包裹破损'
+    case 'recipient_refused': return '收件人拒收'
+    case 'other': return '其他原因'
+    default: return reason
+  }
+}
+
+export function getStatusColor(status: Package['status']): string {
+  switch (status) {
+    case 'stored': return 'text-blue-600'
+    case 'picked_up': return 'text-emerald-600'
+    case 'pending_return': return 'text-red-600'
+    case 'returned': return 'text-slate-500'
+  }
+}
+
+export function getStatusBg(status: Package['status']): string {
+  switch (status) {
+    case 'stored': return 'bg-blue-500/10 border-blue-500/30 text-blue-600'
+    case 'picked_up': return 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600'
+    case 'pending_return': return 'bg-red-500/10 border-red-500/30 text-red-600'
+    case 'returned': return 'bg-slate-500/10 border-slate-500/30 text-slate-500'
   }
 }
 
